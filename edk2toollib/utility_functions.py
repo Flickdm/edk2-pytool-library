@@ -339,53 +339,6 @@ def CatalogSignWithSignTool(SignToolPath, ToSignFilePath, PfxFilePath, PfxPass=N
     return ret
 
 
-def PrintByteList(ByteList, IncludeAscii=True, IncludeOffset=True, IncludeHexSep=True, OffsetStart=0):
-    """Print a byte list as hex and optionally output ascii as well as offset within the buffer."""
-    Ascii = ""
-    for index in range(len(ByteList)):
-        # Start of New Line
-        if (index % 16 == 0):
-            if (IncludeOffset):
-                print("0x%04X -" % (index + OffsetStart), end='')
-
-        # Midpoint of a Line
-        if (index % 16 == 8):
-            if (IncludeHexSep):
-                print(" -", end='')
-
-        # Print As Hex Byte
-        print(" 0x%02X" % ByteList[index], end='')
-
-        # Prepare to Print As Ascii
-        if (ByteList[index] < 0x20) or (ByteList[index] > 0x7E):
-            Ascii += "."
-        else:
-            Ascii += ("%c" % ByteList[index])
-
-        # End of Line
-        if (index % 16 == 15):
-            if (IncludeAscii):
-                print(" %s" % Ascii, end='')
-            Ascii = ""
-            print("")
-
-    # Done - Lets check if we have partial
-    if (index % 16 != 15):
-        # Lets print any partial line of ascii
-        if (IncludeAscii) and (Ascii != ""):
-            # Pad out to the correct spot
-
-            while (index % 16 != 15):
-                print("     ", end='')
-                if (index % 16 == 7):  # account for the - symbol in the hex dump
-                    if (IncludeOffset):
-                        print("  ", end='')
-                index += 1
-            # print the ascii partial line
-            print(" %s" % Ascii, end='')
-            # print a single newline so that next print will be on new line
-        print("")
-
 
 # Simplified Comparison Function borrowed from StackOverflow...
 # https://stackoverflow.com/questions/1714027/version-number-comparison
@@ -470,3 +423,127 @@ def RemoveTree(dir_path: str, ignore_errors: bool = False) -> None:
             break
     else:
         raise RuntimeError(f"Failed to remove {dir_path}")
+
+
+def hexdump(byte_list, offset_start=0, out_fs=sys.stdout, **kwargs):
+    """Print a byte list as hex and optionally output ascii as well as offset within the buffer.
+
+    Args:
+        byte_list: byte array to print
+        offset_start: offset to print to the side of the hexdump
+        out_fs: output file stream to print to
+
+    Keyword Arguments:
+        include_ascii: Boolean option (Default: True) to include ascii
+        include_offset: Boolean option (Default: True) to include the offset
+        include_hex_sep: Boolean option (Default: True) to include the hex seperator
+
+    Returns:
+        None
+    """
+
+    include_ascii = kwargs.get('include_ascii', True)
+    include_offset = kwargs.get('include_offset', True)
+    include_hex_sep = kwargs.get('include_hex_sep', True)
+
+    ascii_string = ""
+    index = 0
+
+    for index, byte in enumerate(byte_list):
+        # Start of New Line
+        if index % 16 == 0 and include_offset:
+            out_fs.write(f"{(index + offset_start):#04x} -")
+
+        # Midpoint of a Line
+        if index % 16 == 8 and include_hex_sep:
+            out_fs.write(" -")
+
+        # Print As Hex Byte
+        out_fs.write(f" {byte:#04x}")
+
+        # Prepare to Print As Ascii
+        if byte < 0x20 or byte > 0x7E:
+            ascii_string += "."
+        else:
+            ascii_string += f"{chr(byte)}"
+
+        # End of Line
+        if index % 16 == 15:
+            if include_ascii:
+                out_fs.write(f" {ascii_string}")
+            ascii_string = ""
+            out_fs.write("\n")
+
+    # Done - Lets check if we have partial
+    if index % 16 != 15:
+        # Lets print any partial line of ascii
+        if include_ascii and ascii_string != "":
+            # Pad out to the correct spot
+
+            while index % 16 != 15:
+                out_fs.write("     ")
+                if index % 16 == 7:  # account for the - symbol in the hex dump
+                    if include_offset:
+                        out_fs.write("  ")
+                index += 1
+            # print the ascii partial line
+            out_fs.write(f" {ascii_string}")
+            # print a single newline so that next print will be on new line
+        out_fs.write("\n")
+
+
+def export_c_type_array(buffer_fs, variable_name, out_fs, **kwargs):
+    """Converts a given binary file to a UEFI typed C style array.
+
+    Args:
+        buffer_fs: buffer file stream to turn into a C style array
+        variable_name: variable name to use for the C style array
+        out_fs: output filestream to write to
+
+    Keyword Arguments:
+        data_type: The datatype of the array (Default: UINT8)
+        length_data_type: The datatype of the length field (Default: UINTN)
+        is_array: if true includes '[]' (Default: True)
+        bytes_per_row: number of bytes to include per row (Default: 16)
+        indent: the characters to use for indention (Default: '    ' (4 spaces))
+        length_variable_name: name to use for the length variable (Default: <variable name>Length)
+
+    Return:
+         None
+
+    Raises:
+        ValueError - Binary file length was 0
+    """
+
+    data_type = kwargs.get("data_type", "UINT8")
+    length_data_type = kwargs.get("length_data_type", "UINTN")
+    is_array = kwargs.get("is_array", True)
+    bytes_per_row = kwargs.get("bytes_per_row", 16)
+    indent = kwargs.get("indent", "    ")
+    length_variable_name = kwargs.get("length_variable_name", f"{variable_name}Length")
+
+    start = buffer_fs.tell()
+    buffer_fs.seek(0, 2)
+    end = buffer_fs.tell()
+    buffer_fs.seek(start)
+    length = end - start
+
+    # for some reason os.linesep causes twice the amount of desired newlines
+    newline = '\n'
+
+    if length == 0:
+        raise ValueError("Binary file length was 0")
+
+    out_fs.write(f"{data_type} {variable_name}{'[]' if is_array else ''} = {{")
+
+    for i, byte in enumerate(buffer_fs.read()):
+        if i % bytes_per_row == 0:
+            out_fs.write(f"{newline}{indent}")
+
+        out_fs.write(f"{byte:#04x}")
+
+        if i != length - 1:
+            out_fs.write(", ")
+
+    out_fs.write(f"{newline}}};")
+    out_fs.write(f"{newline*2}{length_data_type} {length_variable_name} = sizeof {variable_name};{newline*2}")

@@ -12,8 +12,11 @@
 import io
 import struct
 import uuid
+import sys
 from edk2toollib.utility_functions import PrintByteList
 
+from pyasn1.codec.der.decoder import decode as der_decode
+from pyasn1_modules import rfc2315
 
 class WinCertPkcs1(object):
     """Object representing a WinCertPkcs1 struct.
@@ -300,22 +303,38 @@ class WinCertUefiGuid(object):
 
         return self.Decode(object_buffer)
 
-    def Print(self):
-        """Prints struct to console."""
-        self.DumpInfo()
+    def GetCertificate(self):
+        """Returns certificate data, if certificate data exists."""
+        return self.CertData
 
-    def DumpInfo(self):
+    def Print(self, outfs=sys.stdout):
         """Prints struct to console."""
-        print('WIN_CERTIFICATE.dwLength         = {dwLength:08X}'
-              .format(dwLength=self.Hdr_dwLength))
-        print('WIN_CERTIFICATE.wRevision        = {wRevision:04X}'
-              .format(wRevision=self.Hdr_wRevision))
-        print('WIN_CERTIFICATE.wCertificateType = {wCertificateType:04X}'
-              .format(wCertificateType=self.Hdr_wCertificateType))
-        print('WIN_CERTIFICATE_UEFI_GUID.CertType             = {Guid}'
-              .format(Guid=str(self.CertType).upper()))
-        print('sizeof (WIN_CERTIFICATE_UEFI_GUID.CertData)    = {Size:08X}'
-              .format(Size=len(self.CertData)))
+        self.DumpInfo(outfs)
+
+    def DumpInfo(self, outfs=sys.stdout):
+        """Prints struct to a file stream"""
+
+        outfs.write("\n-------------------- WIN_CERTIFICATE ---------------------\n")
+        outfs.write(f"WIN_CERTIFICATE.dwLength         = {self.Hdr_dwLength:08X}\n")
+        outfs.write(f"WIN_CERTIFICATE.wRevision        = {self.Hdr_wRevision:04X}\n")
+        outfs.write(f"WIN_CERTIFICATE.wCertificateType = {self.Hdr_wCertificateType:04X}\n")
+        outfs.write(f"WIN_CERTIFICATE_UEFI_GUID.CertType             = {str(self.CertType).upper()}\n")
+        outfs.write(f"sizeof (WIN_CERTIFICATE_UEFI_GUID.CertData)    = {len(self.CertData):08X}\n")
+
+
+        outfs.write("\n------------------- CERTIFICATE DATA ---------------------\n")
+        # Technically the signature could be wrapped in a ContentInfo 
+        try:
+            content_info, _ = der_decode(self.CertData, asn1Spec=rfc2315.ContentInfo())
+
+            outfs.write(str(content_info))
+        except:
+            try:
+                signed_data, _ = der_decode(self.CertData, asn1Spec=rfc2315.SignedData())
+
+                outfs.write(str(signed_data))
+            except Exception as e:  
+                raise ValueError("Unable to decode CertData") from e
 
     def Write(self, fs):
         """Writes the struct to a filestream."""
