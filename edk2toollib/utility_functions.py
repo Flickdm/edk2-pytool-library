@@ -507,6 +507,7 @@ def export_c_type_array(buffer_fs, variable_name, out_fs, **kwargs):
         bytes_per_row: number of bytes to include per row (Default: 16)
         indent: the characters to use for indention (Default: '    ' (4 spaces))
         length_variable_name: name to use for the length variable (Default: <variable name>Length)
+        include_ascii: includes a ascii comment to side of hex
 
     Return:
          None
@@ -521,6 +522,7 @@ def export_c_type_array(buffer_fs, variable_name, out_fs, **kwargs):
     bytes_per_row = kwargs.get("bytes_per_row", 16)
     indent = kwargs.get("indent", "    ")
     length_variable_name = kwargs.get("length_variable_name", f"{variable_name}Length")
+    include_ascii = kwargs.get("include_ascii", True)
 
     start = buffer_fs.tell()
     buffer_fs.seek(0, 2)
@@ -536,14 +538,44 @@ def export_c_type_array(buffer_fs, variable_name, out_fs, **kwargs):
 
     out_fs.write(f"{data_type} {variable_name}{'[]' if is_array else ''} = {{")
 
+    ascii_string = ""
+    i = 0
+    byte = ''
+    
     for i, byte in enumerate(buffer_fs.read()):
         if i % bytes_per_row == 0:
+            if i != 0 and include_ascii:
+                out_fs.write(f" // {ascii_string}")
+                ascii_string = ""
             out_fs.write(f"{newline}{indent}")
 
         out_fs.write(f"{byte:#04x}")
 
+        if byte < 0x20 or byte > 0x7E:
+            ascii_string += "."
+        else:
+            ascii_string += f"{chr(byte)}"
+
         if i != length - 1:
             out_fs.write(", ")
 
+    # pad out the remaining space
+    if include_ascii:
+        # bytes_per_row - 1 because indexes at 0
+        # subtract the number of bytes we printed
+        # now we know how many bytes we could have printed
+        potential_bytes = (bytes_per_row - 1) - (i % bytes_per_row);
+        
+        # pad out the number of bytes by our byte length
+        # use whatever was left over in byte
+        byte_length = len(f" {byte:#04x},")
+
+        # pad out the the line
+        out_fs.write(" " * potential_bytes * byte_length)
+
+        # make up for the trailing ',' and print a comment
+        out_fs.write(f"   // {ascii_string}")
+
     out_fs.write(f"{newline}}};")
     out_fs.write(f"{newline*2}{length_data_type} {length_variable_name} = sizeof {variable_name};{newline*2}")
+
