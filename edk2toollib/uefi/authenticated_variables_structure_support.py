@@ -31,7 +31,7 @@ from pyasn1.codec.der.encoder import encode as der_encode
 from pyasn1_modules import rfc2315
 
 from edk2toollib.uefi.wincert import WinCert, WinCertUefiGuid
-from edk2toollib.utility_functions import hexdump
+from edk2toollib.utility_functions import PrintByteList
 from edk2toollib.uefi.uefi_multi_phase import EfiVariableAttributes
 
 
@@ -141,7 +141,7 @@ class EfiSignatureDataEfiCertX509(object):
                 if (self.SignatureDataSize != len(sdl)):
                     raise Exception(
                         "Invalid Signature Data Size vs Length of data")
-                hexdump(sdl)
+                PrintByteList(sdl)
         else:
             s = "ESD:EFI_CERT_X509,"
             s += f"{str(self.SignatureOwner)},"
@@ -955,7 +955,7 @@ class EfiVariableAuthentication2(object):
             sdl = self.Payload.tolist()
             if (self.PayloadSize != len(sdl)):
                 raise Exception("Invalid Payload Data Size vs Length of data")
-            hexdump(sdl)
+            PrintByteList(sdl)
 
     def Write(self, fs) -> None:
         """Serializes the object and writes it to a filestream.

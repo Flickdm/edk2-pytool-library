@@ -425,7 +425,7 @@ def RemoveTree(dir_path: str, ignore_errors: bool = False) -> None:
         raise RuntimeError(f"Failed to remove {dir_path}")
 
 
-def hexdump(byte_list, offset_start=0, out_fs=sys.stdout, **kwargs):
+def PrintByteList(byte_list, offset_start=0, out_fs=sys.stdout, **kwargs):
     """Print a byte list as hex and optionally output ascii as well as offset within the buffer.
 
     Args:
@@ -564,8 +564,8 @@ def export_c_type_array(buffer_fs, variable_name, out_fs, **kwargs):
         # bytes_per_row - 1 because indexes at 0
         # subtract the number of bytes we printed
         # now we know how many bytes we could have printed
-        potential_bytes = (bytes_per_row - 1) - (i % bytes_per_row);
-        
+        potential_bytes = (bytes_per_row - 1) - (i % bytes_per_row)
+    
         # pad out the number of bytes by our byte length
         # use whatever was left over in byte
         byte_length = len(f" {byte:#04x},")
