@@ -24,8 +24,10 @@ from collections import namedtuple
 from enum import Enum as StdEnum
 import locale
 
+from warnings import warn
 
-def Enum(*args): # noqa
+
+def Enum(*args):  # noqa
     items = []
     if len(args) == 1:
         item = args[0]
@@ -49,14 +51,15 @@ def Enum(*args): # noqa
 
 # https://stackoverflow.com/questions/2829329/catch-a-threads-exception-in-the-caller-thread-in-python
 # TODO make this a private class.
-class PropagatingThread(threading.Thread): # noqa
+class PropagatingThread(threading.Thread):  # noqa
     """Class to support running commands from the shell in a python environment.
 
     Don't use directly.
 
     PropagatingThread copied from sample here:
     """
-    def run(self): # noqa
+
+    def run(self):  # noqa
         self.exc = None
         try:
             if hasattr(self, '_Thread__target'):
@@ -67,7 +70,7 @@ class PropagatingThread(threading.Thread): # noqa
         except BaseException as e:
             self.exc = e
 
-    def join(self, timeout=None): # noqa
+    def join(self, timeout=None):  # noqa
         super(PropagatingThread, self).join()
         if self.exc:
             raise self.exc
@@ -76,7 +79,7 @@ class PropagatingThread(threading.Thread): # noqa
 
 # http://stackoverflow.com/questions/19423008/logged-subprocess-communicate
 # TODO make this a private function
-def reader(filepath, outstream, stream, logging_level=logging.INFO, encodingErrors='strict'): # noqa
+def reader(filepath, outstream, stream, logging_level=logging.INFO, encodingErrors='strict'):  # noqa
     """Helper functions for running commands from the shell in python environment.
 
     Don't use directly
@@ -339,7 +342,6 @@ def CatalogSignWithSignTool(SignToolPath, ToSignFilePath, PfxFilePath, PfxPass=N
     return ret
 
 
-
 # Simplified Comparison Function borrowed from StackOverflow...
 # https://stackoverflow.com/questions/1714027/version-number-comparison
 # With Python 3.0 help from:
@@ -425,8 +427,23 @@ def RemoveTree(dir_path: str, ignore_errors: bool = False) -> None:
         raise RuntimeError(f"Failed to remove {dir_path}")
 
 
-def PrintByteList(byte_list, offset_start=0, out_fs=sys.stdout, **kwargs):
-    """Print a byte list as hex and optionally output ascii as well as offset within the buffer.
+def PrintByteList(ByteList, IncludeAscii=True, IncludeOffset=True, IncludeHexSep=True, OffsetStart=0, **kwargs):
+    """Print a byte array as hex and optionally output ascii as well as offset within the buffer."""
+
+    out_fs = kwargs.get("out_fs", sys.stdout)
+    kwargs["include_ascii"] = IncludeAscii
+    kwargs["include_hex_sep"] = IncludeHexSep
+    kwargs["include_offset"] = IncludeOffset
+
+    warn(
+        "This function is being replaced by hexdump, if you rely on this behavior switch to hexdump",
+        DeprecationWarning
+    )
+    hexdump(ByteList, offset_start=OffsetStart, out_fs=out_fs, **kwargs)
+
+
+def hexdump(byte_list, offset_start=0, out_fs=sys.stdout, **kwargs):
+    """Print a byte array as hex and optionally output ascii as well as offset within the buffer.
 
     Args:
         byte_list: byte array to print
@@ -541,7 +558,7 @@ def export_c_type_array(buffer_fs, variable_name, out_fs, **kwargs):
     ascii_string = ""
     i = 0
     byte = ''
-    
+
     for i, byte in enumerate(buffer_fs.read()):
         if i % bytes_per_row == 0:
             if i != 0 and include_ascii:
@@ -565,7 +582,7 @@ def export_c_type_array(buffer_fs, variable_name, out_fs, **kwargs):
         # subtract the number of bytes we printed
         # now we know how many bytes we could have printed
         potential_bytes = (bytes_per_row - 1) - (i % bytes_per_row)
-    
+
         # pad out the number of bytes by our byte length
         # use whatever was left over in byte
         byte_length = len(f" {byte:#04x},")
@@ -578,4 +595,3 @@ def export_c_type_array(buffer_fs, variable_name, out_fs, **kwargs):
 
     out_fs.write(f"{newline}}};")
     out_fs.write(f"{newline*2}{length_data_type} {length_variable_name} = sizeof {variable_name};{newline*2}")
-

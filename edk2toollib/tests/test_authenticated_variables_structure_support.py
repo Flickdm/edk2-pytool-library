@@ -1864,7 +1864,7 @@ class EfiTimeTest(unittest.TestCase):
 
             efi_time2 = EfiTime(decodefs=byte_stream)
 
-            self.assertEqual(efi_time.encode(), efi_time2.encode())
+            self.assertEqual(efi_time.Encode(), efi_time2.Encode())
 
 
 
